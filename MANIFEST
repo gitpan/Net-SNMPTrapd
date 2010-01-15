@@ -1,0 +1,9 @@
+Changes
+Makefile.PL
+MANIFEST
+README
+bin/snmptrapd-sendtest.pl
+bin/snmptrapd-simple.pl
+t/Net-SNMPTrapd.t
+lib/Net/SNMPTrapd.pm
+META.yml                                 Module meta-data (added by MakeMaker)
