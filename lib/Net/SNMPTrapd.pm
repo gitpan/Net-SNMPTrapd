@@ -15,7 +15,7 @@ use Exporter;
 use IO::Socket;
 use Convert::ASN1;
 
-our $VERSION     = '0.01';
+our $VERSION     = '0.02';
 our @ISA         = qw(Exporter);
 our @EXPORT      = qw();
 our %EXPORT_TAGS = (
@@ -43,22 +43,32 @@ sub new {
     my $self = shift;
     my $class = ref($self) || $self;
 
-    my %cfg = @_;
-
     my %params = (
-        'Proto' => 'udp',
-        'LocalPort' => $cfg{'LocalPort'} || SNMPTRAPD_DEFAULT_PORT,
+        'Proto'     => 'udp',
+        'LocalPort' => SNMPTRAPD_DEFAULT_PORT,
+        'Timeout'   => 10
     );
 
-    if ($cfg{'LocalAddr'}) {
-        $params{'LocalAddr'} = $cfg{'LocalAddr'}
+    my %cfg;
+    if (@_ == 1) {
+        $LASTERROR = "Insufficient number of args - @_";
+        return(undef)
+    } else {
+        %cfg = @_;
+        for (keys(%cfg)) {
+            if (/^-?localport$/i) {
+                $params{'LocalPort'} = $cfg{$_}
+            } elsif (/^-?localaddr$/i) {
+                $params{'LocalAddr'} = $cfg{$_}
+            } elsif (/^-?timeout$/i) {
+                $params{'Timeout'} = $cfg{$_}
+            }
+        }
     }
 
     if (my $udpserver = IO::Socket::INET->new(%params)) {
         return bless {
-                      'LocalPort'   => SNMPTRAPD_DEFAULT_PORT,
-                      'Timeout'     => 10,
-                      %cfg,         # merge user parameters
+                      %params,         # merge user parameters
                       '_UDPSERVER_' => $udpserver
                      }, $class
     } else {
@@ -268,7 +278,7 @@ sub agentaddr {
 sub generic_trap {
     my ($self, $arg) = @_;
 
-    if (defined($arg) && ($arg > 1)) {
+    if (defined($arg) && ($arg >= 1)) {
         return $self->{'_TRAP_'}{'generic_trap'}
     } else {
         return $TRAPTYPES[$self->{'_TRAP_'}{'generic_trap'}]
@@ -436,7 +446,7 @@ header on the UDP datagram.
 Return SNMP Trap version from a received and processed 
 (C<process_trap()>) SNMP trap.
 
-B<NOTE:>  This script only decodes SNMP v1 and v2c traps.
+B<NOTE:>  This module only decodes SNMP v1 and v2c traps.
 
 =head3 community() - return community from SNMP trap
 
@@ -534,7 +544,7 @@ Return error_status from a received and processed
 Return error index from a received and processed 
 (C<process_trap()>) SNMP v2c trap.
 
-=head2 error() - print last error
+=head2 error() - return last error
 
   printf "Error: %s\n", Net::SNMPTrapd->error;
 
