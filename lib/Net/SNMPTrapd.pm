@@ -15,7 +15,7 @@ use Exporter;
 use IO::Socket;
 use Convert::ASN1;
 
-our $VERSION     = '0.02';
+our $VERSION     = '0.03';
 our @ISA         = qw(Exporter);
 our @EXPORT      = qw();
 our %EXPORT_TAGS = (

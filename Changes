@@ -7,3 +7,8 @@ Revision history for Perl extension Net::SNMPTrapd.
 0.02  Mon Jan 18 16:29:48 2010
       - Allowed legacy and case insensitive calling of switches.
 
+0.03  Mon Feb  5 09:29:48 2010
+      - Updated tests to address Activestate auto-building of PPM 
+        which threw an error even though one didn't exist and 
+        every other version of build - including CPAN Testers 
+        had NO issues whatsoever.
