@@ -9,16 +9,17 @@ my %opt;
 my ($opt_help, $opt_man);
 
 GetOptions(
-  'version=i'     => \$opt{'version'},
-  'community=s'   => \$opt{'community'},
-  'integer|n=i'   => \$opt{'integer'},
-  'string=s'      => \$opt{'string'},
-  'oid=s'         => \$opt{'oid'},
-  'ip|I=s'        => \$opt{'ip'},
-  'counter32|C=i' => \$opt{'counter32'},
-  'gauge32=i'     => \$opt{'gauge32'},
-  'timeticks=i'   => \$opt{'timeticks'},
-  'opaque|q=s'    => \$opt{'opaque'},
+  'version=i'     => \$opt{version},
+  'community=s'   => \$opt{community},
+  'integer|n=i'   => \$opt{integer},
+  'string=s'      => \$opt{string},
+  'oid=s'         => \$opt{oid},
+  'ip|A=s'        => \$opt{ip},
+  'counter32|C=i' => \$opt{counter32},
+  'gauge32=i'     => \$opt{gauge32},
+  'timeticks=i'   => \$opt{timeticks},
+  'opaque|q=s'    => \$opt{opaque},
+  'I|inform!'     => \$opt{inform},
   'help!'         => \$opt_help,
   'man!'          => \$opt_man
 ) or pod2usage(-verbose => 0);
@@ -31,23 +32,24 @@ if (!@ARGV) {
     $ARGV[0] = 'localhost'
 }
 
-$opt{'version'}   = $opt{'version'}   || 1;
-$opt{'community'} = $opt{'community'} || 'public';
-$opt{'integer'}   = $opt{'integer'}   || 1;
-$opt{'string'}    = $opt{'string'}    || 'String';
-$opt{'oid'}       = $opt{'oid'}       || '1.2.3.4.5.6.7.8.9';
-$opt{'ip'}        = $opt{'ip'}        || '10.10.10.1';
-$opt{'counter32'} = $opt{'counter32'} || 32323232;
-$opt{'gauge32'}   = $opt{'gauge32'}   || 42424242;
-$opt{'timeticks'} = $opt{'timeticks'} || time();
-$opt{'opaque'}    = $opt{'opaque'}    || 'opaque data';
+$opt{version}   = $opt{version}   || 1;
+$opt{community} = $opt{community} || 'public';
+$opt{integer}   = $opt{integer}   || 1;
+$opt{string}    = $opt{string}    || 'String';
+$opt{oid}       = $opt{oid}       || '1.2.3.4.5.6.7.8.9';
+$opt{ip}        = $opt{ip}        || '10.10.10.1';
+$opt{counter32} = $opt{counter32} || 32323232;
+$opt{gauge32}   = $opt{gauge32}   || 42424242;
+$opt{timeticks} = $opt{timeticks} || time();
+$opt{opaque}    = $opt{opaque}    || 'opaque data';
+$opt{inform}    = $opt{inform}    || 0;
 
 for my $host (@ARGV) {
 
     my ($session, $error) = Net::SNMP->session(
                                                -hostname  => $host,
-                                               -version   => $opt{'version'},
-                                               -community => $opt{'community'},
+                                               -version   => $opt{version},
+                                               -community => $opt{community},
                                                -port      => SNMP_TRAP_PORT
                                               );
 
@@ -56,40 +58,57 @@ for my $host (@ARGV) {
        exit 1
     } 
 
-    if ($opt{'version'} == 1) {
+    if ($opt{version} == 1) {
         my $result = $session->trap(
             -enterprise   => '1.3.6.1.4.1.50000',
             -generictrap  => 6,
             -specifictrap => 1,
             -timestamp    => time(),
             -varbindlist  => [
-                '1.3.6.1.4.1.50000.1.3',  INTEGER,           $opt{'integer'},
-                '1.3.6.1.4.1.50000.1.4',  OCTET_STRING,      $opt{'string'},
-                '1.3.6.1.4.1.50000.1.5',  OBJECT_IDENTIFIER, $opt{'oid'},
-                '1.3.6.1.4.1.50000.1.6',  IPADDRESS,         $opt{'ip'},
-                '1.3.6.1.4.1.50000.1.7',  COUNTER32,         $opt{'counter32'},
-                '1.3.6.1.4.1.50000.1.8',  GAUGE32,           $opt{'gauge32'},
-                '1.3.6.1.4.1.50000.1.9',  TIMETICKS,         $opt{'timeticks'},
-                '1.3.6.1.4.1.50000.1.10', OPAQUE,            $opt{'opaque'}
+                '1.3.6.1.4.1.50000.1.3',  INTEGER,           $opt{integer},
+                '1.3.6.1.4.1.50000.1.4',  OCTET_STRING,      $opt{string},
+                '1.3.6.1.4.1.50000.1.5',  OBJECT_IDENTIFIER, $opt{oid},
+                '1.3.6.1.4.1.50000.1.6',  IPADDRESS,         $opt{ip},
+                '1.3.6.1.4.1.50000.1.7',  COUNTER32,         $opt{counter32},
+                '1.3.6.1.4.1.50000.1.8',  GAUGE32,           $opt{gauge32},
+                '1.3.6.1.4.1.50000.1.9',  TIMETICKS,         $opt{timeticks},
+                '1.3.6.1.4.1.50000.1.10', OPAQUE,            $opt{opaque}
             ]
         )
-    } elsif ($opt{'version'} == 2) {
-        my $result = $session->snmpv2_trap(
-            -varbindlist  => [
-                '1.3.6.1.2.1.1.3.0',      TIMETICKS,         time(),
-                '1.3.6.1.6.3.1.1.4.1.0',  OBJECT_IDENTIFIER, '1.3.6.1.4.1.50000',
-                '1.3.6.1.4.1.50000.1.3',  INTEGER,           $opt{'integer'},
-                '1.3.6.1.4.1.50000.1.4',  OCTET_STRING,      $opt{'string'},
-                '1.3.6.1.4.1.50000.1.5',  OBJECT_IDENTIFIER, $opt{'oid'},
-                '1.3.6.1.4.1.50000.1.6',  IPADDRESS,         $opt{'ip'},
-                '1.3.6.1.4.1.50000.1.7',  COUNTER32,         $opt{'counter32'},
-                '1.3.6.1.4.1.50000.1.8',  GAUGE32,           $opt{'gauge32'},
-                '1.3.6.1.4.1.50000.1.9',  TIMETICKS,         $opt{'timeticks'},
-                '1.3.6.1.4.1.50000.1.10', OPAQUE,            $opt{'opaque'}
-            ]
-        )
+    } elsif ($opt{version} == 2) {
+        if ($opt{inform}) {
+            my $result = $session->inform_request(
+                -varbindlist  => [
+                    '1.3.6.1.2.1.1.3.0',      TIMETICKS,         time(),
+                    '1.3.6.1.6.3.1.1.4.1.0',  OBJECT_IDENTIFIER, '1.3.6.1.4.1.50000',
+                    '1.3.6.1.4.1.50000.1.3',  INTEGER,           $opt{integer},
+                    '1.3.6.1.4.1.50000.1.4',  OCTET_STRING,      $opt{string},
+                    '1.3.6.1.4.1.50000.1.5',  OBJECT_IDENTIFIER, $opt{oid},
+                    '1.3.6.1.4.1.50000.1.6',  IPADDRESS,         $opt{ip},
+                    '1.3.6.1.4.1.50000.1.7',  COUNTER32,         $opt{counter32},
+                    '1.3.6.1.4.1.50000.1.8',  GAUGE32,           $opt{gauge32},
+                    '1.3.6.1.4.1.50000.1.9',  TIMETICKS,         $opt{timeticks},
+                    '1.3.6.1.4.1.50000.1.10', OPAQUE,            $opt{opaque}
+                ]
+            )
+        } else {
+            my $result = $session->snmpv2_trap(
+                -varbindlist  => [
+                    '1.3.6.1.2.1.1.3.0',      TIMETICKS,         time(),
+                    '1.3.6.1.6.3.1.1.4.1.0',  OBJECT_IDENTIFIER, '1.3.6.1.4.1.50000',
+                    '1.3.6.1.4.1.50000.1.3',  INTEGER,           $opt{integer},
+                    '1.3.6.1.4.1.50000.1.4',  OCTET_STRING,      $opt{string},
+                    '1.3.6.1.4.1.50000.1.5',  OBJECT_IDENTIFIER, $opt{oid},
+                    '1.3.6.1.4.1.50000.1.6',  IPADDRESS,         $opt{ip},
+                    '1.3.6.1.4.1.50000.1.7',  COUNTER32,         $opt{counter32},
+                    '1.3.6.1.4.1.50000.1.8',  GAUGE32,           $opt{gauge32},
+                    '1.3.6.1.4.1.50000.1.9',  TIMETICKS,         $opt{timeticks},
+                    '1.3.6.1.4.1.50000.1.10', OPAQUE,            $opt{opaque}
+                ]
+            )
+        }
     } else {
-        print "Error: Unknown version - $opt{'version'}\n";
+        print "Error: Unknown version - $opt{version}\n";
         exit 1
     }
     $session->close()
@@ -126,6 +145,9 @@ The user can configure the values with the options.
  host           The host to send to.
                 DEFAULT:  (or not specified) localhost.
 
+ -A <IP_ADDR>   SNMP IPADDRESS value.
+ --ip           DEFAULT:  (or not specified) 10.10.10.1
+
  -C #           SNMP COUNTER32 value.
  --counter32    DEFAULT:  (or not specified) 32323232
 
@@ -135,8 +157,9 @@ The user can configure the values with the options.
  -g #           SNMP GAUGE32 value.
  --gauge32      DEFAULT:  (or not specified) 42424242
 
- -I <IP_ADDR>   SNMP IPADDRESS value.
- --ip           DEFAULT:  (or not specified) 10.10.10.1
+ -I #           Send SNMPv2 InformRequest instead of SNMPv2 Trap.
+ --inform       Only valid with -v 2.
+                DEFAULT:  (or not specified) [SNMPv1 trap]
 
  -in #          SNMP INTEGER value.
  --integer      DEFAULT:  (or not specified) 1

@@ -12,3 +12,19 @@ Revision history for Perl extension Net::SNMPTrapd.
         which threw an error even though one didn't exist and 
         every other version of build - including CPAN Testers 
         had NO issues whatsoever.
+
+0.04  Thu Oct  21 12:00:00 2010
+      - Based on request user request, implemented parsing and 
+        response for SNMPv2 InformRequest PDUs.
+      - Added the pdu_type method.
+      - Updated Convert::ASN1 structures used in module.
+      - Updated bin/ scripts.
+      - Updated test.pl script to test for InformRequest and 
+        Response.
+      - Increased default PDU size to 65467.
+      - Added PDU size and timeout options to get_trap() method.
+        Provided options for RFC and recommended PDU sizes.
+      - Added hex dump option to datagram() method.
+      - Added dump() method/subroutine to use the Convert::ASN1 
+        debug subroutines directly for ASN.1 decode troubleshooting.
+      - More detailed error messages and more code comments.

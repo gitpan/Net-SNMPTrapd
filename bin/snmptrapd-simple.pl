@@ -9,9 +9,10 @@ my %opt;
 my ($opt_help, $opt_man);
 
 GetOptions(
-  'directory=s' => \$opt{'dir'},
-  'interface:i' => \$opt{'interface'},
-  'write+'      => \$opt{'write'},
+  'directory=s' => \$opt{dir},
+  'Hexdump!'    => \$opt{hex},
+  'interface:i' => \$opt{interface},
+  'write+'      => \$opt{write},
   'help!'       => \$opt_help,
   'man!'        => \$opt_man
 ) or pod2usage(-verbose => 0);
@@ -19,32 +20,34 @@ GetOptions(
 pod2usage(-verbose => 1) if defined $opt_help;
 pod2usage(-verbose => 2) if defined $opt_man;
 
+$opt{hex} = $opt{hex} || 0;
+
 # -d is a directory, if it exists, assign it
-if (defined($opt{'dir'})) {
+if (defined($opt{dir})) {
 
     # replace \ with / for compatibility with UNIX/Windows
-    $opt{'dir'} =~ s/\\/\//g;
+    $opt{dir} =~ s/\\/\//g;
 
     # remove trailing / so we're sure it does NOT exist and we CAN put it in later
-    $opt{'dir'} =~ s/\/$//;
+    $opt{dir} =~ s/\/$//;
 
-    if (!(-e $opt{'dir'})) {
-        print "$0: directory does not exist - $opt{'dir'}";
+    if (!(-e $opt{dir})) {
+        print "$0: directory does not exist - $opt{dir}";
         exit 1
     }
-    $opt{'write'} = 1 if (!$opt{'write'})
+    $opt{write} = 1 if (!$opt{write})
 }
 
-if (defined($opt{'interface'})) {
-    if (!(($opt{'interface'} > 0) && ($opt{'interface'} < 65536))) {
-        print "$0: port not valid - $opt{'interface'}"
+if (defined($opt{interface})) {
+    if (!(($opt{interface} > 0) && ($opt{interface} < 65536))) {
+        print "$0: port not valid - $opt{interface}"
     }
 } else {
-    $opt{'interface'} = '162'
+    $opt{interface} = '162'
 }
 
 my $snmptrapd = Net::SNMPTrapd->new(
-                                    'LocalPort' => $opt{'interface'}
+                                    'LocalPort' => $opt{interface}
                                    );
 
 if (!$snmptrapd) {
@@ -53,41 +56,52 @@ if (!$snmptrapd) {
 }
 
 while (1) {
-    my $trap;
-    if (!($trap = $snmptrapd->get_trap())) { next }
+    my $trap = $snmptrapd->get_trap();
 
-    if (!(defined($trap->process_trap()))) {
+    if (!defined($trap)) {
+        printf "$0: %s\n", Net::SNMPTrapd->error;
+        exit 1
+    } elsif ($trap == 0) {
+        next
+    }
+
+    if (!defined($trap->process_trap())) {
         printf "$0: %s\n", Net::SNMPTrapd->error
     } else {
-        my $p = sprintf "%s\t%i\t%i\t%s\t", 
-                         $trap->peeraddr, 
-                         $trap->peerport, 
-                         $trap->version, 
-                         $trap->community;
-        if ($trap->version == 1) {
-            $p .= sprintf "%s\t%s\t%s\t%s\t%s\t", 
-                         $trap->ent_OID, 
-                         $trap->agentaddr, 
-                         $trap->generic_trap, 
-                         $trap->specific_trap, 
-                         $trap->timeticks
+        my $p;
+        if ($opt{hex}) {
+            $p = $trap->datagram(1)
         } else {
-            $p .= sprintf "%s\t%s\t%s\t", 
-                         $trap->request_ID, 
-                         $trap->error_status, 
-                         $trap->error_index
-        }
-        for my $varbind (@{$trap->varbinds}) {
-            for (keys(%{$varbind})) {
-                $p .= sprintf "%s: %s; ", $_, $varbind->{$_}
+            $p = sprintf "%s\t%i\t%i\t%s\t%s\t", 
+                             $trap->peeraddr, 
+                             $trap->peerport, 
+                             $trap->version, 
+                             $trap->community,
+                             $trap->pdu_type;
+            if ($trap->version == 1) {
+                $p .= sprintf "%s\t%s\t%s\t%s\t%s\t", 
+                             $trap->ent_OID, 
+                             $trap->agentaddr, 
+                             $trap->generic_trap, 
+                             $trap->specific_trap, 
+                             $trap->timeticks
+            } else {
+                $p .= sprintf "%s\t%s\t%s\t", 
+                             $trap->request_ID, 
+                             $trap->error_status, 
+                             $trap->error_index
+            }
+            for my $varbind (@{$trap->varbinds}) {
+                for (keys(%{$varbind})) {
+                    $p .= sprintf "%s: %s; ", $_, $varbind->{$_}
+                }
             }
         }
-
         print "$p\n";
 
-        if ($opt{'write'}) {
+        if ($opt{write}) {
             my $outfile;
-            if (defined($opt{'dir'})) { $outfile = $opt{'dir'} . "/" }
+            if (defined($opt{dir})) { $outfile = $opt{dir} . "/" }
 
             $outfile .= "snmptrapd.log";
             
@@ -112,13 +126,14 @@ SNMPTRAPD-SIMPLE - Simple SNMP Trap Server
 =head1 DESCRIPTION
 
 Listens for SNMP traps and logs to console and optional 
-file.  Can decode SNMP v1 and v2c traps.  SNMP Trap columns 
-are:
+file.  Can decode SNMP v1 and v2c traps and v2c InformRequest 
+(will send Response PDU).  Output columns are:
 
         Source IP Address
         Source UDP port
         SNMP version
         SNMP community
+        PDU Type
   (Version 1)          (Version 2c)
   Enterprise OID       Request ID
   Agent IP Address     Error Status
@@ -131,6 +146,9 @@ are:
 
  -d <dir>         Output file directory.
  --directory      DEFAULT:  (or not specified) [Current].
+
+ -H               Print hex dump of trap PDU - do not decode.
+ --Hexdump        DEFAULT:  (or not specified) [Decode trap].
 
  -i #             UDP Port to listen on.
  --interface      DEFAULT:  (or not specified) 162.

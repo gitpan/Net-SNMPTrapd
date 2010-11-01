@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Net-SNMPTrapd
-version:            0.03
+version:            0.04
 abstract:           Perl implementation of SNMP Trap Listener
 author:
     - Michael Vincent <vin at vinsworld dot com>
@@ -18,7 +18,7 @@ no_index:
     directory:
         - t
         - inc
-generated_by:       ExtUtils::MakeMaker version 6.55_02
+generated_by:       ExtUtils::MakeMaker version 6.56
 meta-spec:
     url:      http://module-build.sourceforge.net/META-spec-v1.4.html
     version:  1.4

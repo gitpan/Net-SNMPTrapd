@@ -1,4 +1,4 @@
-Net-SNMPTrapd version 0.03
+Net-SNMPTrapd version 0.04
 ==========================
 
 INSTALLATION
@@ -28,5 +28,4 @@ Copyright (C) 2010 by Michael Vincent (www.VinsWorld.com)
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.10.1 or,
 at your option, any later version of Perl 5 you may have available.
-
 
