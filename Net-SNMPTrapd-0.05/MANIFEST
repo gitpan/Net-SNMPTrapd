@@ -8,3 +8,4 @@ t/Net-SNMPTrapd.t
 test.pl
 lib/Net/SNMPTrapd.pm
 META.yml                                 Module meta-data (added by MakeMaker)
+META.json                                Module JSON meta-data (added by MakeMaker)

@@ -9,6 +9,8 @@ my %opt;
 my ($opt_help, $opt_man);
 
 GetOptions(
+  '4!'          => \$opt{4},
+  '6!'          => \$opt{6},
   'directory=s' => \$opt{dir},
   'Hexdump!'    => \$opt{hex},
   'interface:i' => \$opt{interface},
@@ -19,6 +21,12 @@ GetOptions(
 
 pod2usage(-verbose => 1) if defined $opt_help;
 pod2usage(-verbose => 2) if defined $opt_man;
+
+# Default to IPv4
+my $family = 4;
+if ($opt{6}) {
+    $family = 6
+}
 
 $opt{hex} = $opt{hex} || 0;
 
@@ -47,7 +55,8 @@ if (defined($opt{interface})) {
 }
 
 my $snmptrapd = Net::SNMPTrapd->new(
-                                    'LocalPort' => $opt{interface}
+                                    LocalPort => $opt{interface},
+                                    Family    => $family
                                    );
 
 if (!$snmptrapd) {
@@ -93,7 +102,15 @@ while (1) {
             }
             for my $varbind (@{$trap->varbinds}) {
                 for (keys(%{$varbind})) {
-                    $p .= sprintf "%s: %s; ", $_, $varbind->{$_}
+                    # Here, one could use a MIB translation table or 
+                    # Perl module to map OID's ($_) to text and values 
+                    # ($varbind->{$_}) to applicable meanings or metrics.
+                    # This example just prints -> OID: val; OID: val; ...
+                    if ($varbind->{$_} =~ /[\x00-\x1f\x7f-\xff]/s) {
+                        $p .= sprintf "%s: 0x%s; ", $_, unpack ("H*", $varbind->{$_})
+                    } else {
+                        $p .= sprintf "%s: %s; ", $_, $varbind->{$_}
+                    }
                 }
             }
         }
@@ -143,6 +160,9 @@ file.  Can decode SNMP v1 and v2c traps and v2c InformRequest
         Varbinds (OID: val; [...])
 
 =head1 OPTIONS
+
+ -4               Force IPv4.
+ -6               Force IPv6 (overrides -4).
 
  -d <dir>         Output file directory.
  --directory      DEFAULT:  (or not specified) [Current].

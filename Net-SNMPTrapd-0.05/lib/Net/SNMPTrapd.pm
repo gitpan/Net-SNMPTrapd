@@ -12,10 +12,10 @@ require 5.005;
 use strict;
 use Exporter;
 
-use IO::Socket;
+use IO::Socket::IP -register;
 use Convert::ASN1;
 
-our $VERSION     = '0.04';
+our $VERSION     = '0.05';
 our @ISA         = qw(Exporter);
 our @EXPORT      = qw();
 our %EXPORT_TAGS = (
@@ -50,7 +50,8 @@ sub new {
     my %params = (
         'Proto'     => 'udp',
         'LocalPort' => SNMPTRAPD_DEFAULT_PORT,
-        'Timeout'   => 10
+        'Timeout'   => 10,
+        'Family'    => AF_INET
     );
 
     if (@_ == 1) {
@@ -63,6 +64,17 @@ sub new {
                 $params{'LocalPort'} = $cfg{$_}
             } elsif (/^-?localaddr$/i) {
                 $params{'LocalAddr'} = $cfg{$_}
+            } elsif (/^-?family$/i) {
+                if ($cfg{$_} =~ /^[46]$/) {
+                    if ($cfg{$_} == 4) {
+                        $params{'Family'} = AF_INET
+                    } else {
+                        $params{'Family'} = AF_INET6
+                    }
+                } else {
+                    $LASTERROR = "Invalid family - $cfg{$_}";
+                    return(undef)
+                }
             } elsif (/^-?timeout$/i) {
                 if ($cfg{$_} =~ /^\d+$/) {
                     $params{'Timeout'} = $cfg{$_}
@@ -74,7 +86,7 @@ sub new {
         }
     }
 
-    if (my $udpserver = IO::Socket::INET->new(%params)) {
+    if (my $udpserver = IO::Socket::IP->new(%params)) {
         return bless {
                       %params,         # merge user parameters
                       '_UDPSERVER_' => $udpserver
@@ -143,9 +155,8 @@ sub get_trap {
         # read the message
         if ($udpserver->recv($datagram, $datagramsize)) {
 
-            my ($peerport, $peeraddr) = sockaddr_in($udpserver->peername);
-            $trap->{'_TRAP_'}{'PeerPort'} = $peerport;
-            $trap->{'_TRAP_'}{'PeerAddr'} = inet_ntoa($peeraddr);
+            $trap->{'_TRAP_'}{'PeerPort'} = $udpserver->peerport;
+            $trap->{'_TRAP_'}{'PeerAddr'} = $udpserver->peerhost;
             $trap->{'_TRAP_'}{'datagram'} = $datagram;
 
             return bless $trap, $class
@@ -275,7 +286,7 @@ sub process_trap {
     if ($pdutype eq 'trap') {
         $self->{'_TRAP_'}{'pdu_type'} = 4
     
-    } elsif ($pdutype eq 'inform-request') { 
+    } elsif ($pdutype eq 'inform-request') {
         $self->{'_TRAP_'}{'pdu_type'} = 6;
 
         # send response for InformRequest
@@ -490,7 +501,6 @@ sub _InformRequest_Response {
         return $asn->error
     }
     #DEBUG print "BUFFER = $buffer\n";
-
     if ($$self->{'_TRAP_'}->{'PeerAddr'} eq "") {
         return "Peer Addr undefined"
     }
@@ -498,11 +508,16 @@ sub _InformRequest_Response {
         return "Peer Port undefined"
     }
 
-    my $socket = IO::Socket::INET->new(
-                                       Proto    => "udp",
-                                       PeerAddr => $$self->{'_TRAP_'}->{'PeerAddr'},
-                                       PeerPort => $$self->{'_TRAP_'}->{'PeerPort'}
-                                      ) || return "Can't create Response socket";
+    my $socket = IO::Socket::IP->new(
+                                     Proto     => "udp",
+                                     PeerAddr  => $$self->{'_TRAP_'}->{'PeerAddr'},
+                                     PeerPort  => $$self->{'_TRAP_'}->{'PeerPort'},
+                                     # LocalPort should be set, but creates error.
+                                     # Tried setting ReusePort on initial server, 
+                                     # but not implemented on Windows.  What to do?
+                                     #LocalPort => SNMPTRAPD_DEFAULT_PORT,
+                                     Family    => $$self->{'Family'}
+                                    ) || return "Can't create Response socket";
     $socket->send($buffer);
     close $socket;
     return ("OK")
@@ -572,6 +587,8 @@ Valid options are:
 
   Option     Description                            Default
   ------     -----------                            -------
+  -Family    Address family IPv4/IPv6                     4
+             given as integer 4 or 6
   -LocalAddr Interface to bind to                       any
   -LocalPort Port to bind server to                     162
   -timeout   Timeout in seconds for socket               10
@@ -629,7 +646,7 @@ dump, use the optional boolean argument.
   $trap->process_trap([OPTIONS]);
 
 Process a received SNMP trap.  Decodes the received (C<get_trap()>) 
-PDU.  Varbinds are extracted and decoded.  If PDU is SNMPv2 
+PDU.  Varbinds are extracted and decoded.  If PDU is SNMPv2
 InformRequest, the Response PDU is generated and sent to IP 
 address and UDP port found in the original datagram header 
 (C<get_trap()> methods C<peeraddr()> and C<peerport()>).
@@ -647,7 +664,7 @@ Valid options are:
 This can also be called as a procedure if one is inclined to write 
 their own UDP listener instead of using C<get_trap()>.  For example: 
 
-  $sock = IO::Socket::INET->new( blah blah blah );
+  $sock = IO::Socket::IP->new( blah blah blah );
   $sock->recv($datagram, 1500);
   # process the ASN.1 encoded datagram in $datagram variable
   $trap = Net::SNMPTrapd->process_trap($datagram);

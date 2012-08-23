@@ -28,3 +28,7 @@ Revision history for Perl extension Net::SNMPTrapd.
       - Added dump() method/subroutine to use the Convert::ASN1 
         debug subroutines directly for ASN.1 decode troubleshooting.
       - More detailed error messages and more code comments.
+
+0.05  Thu Aug  23 19:00:00 2012
+      - Changed to IO::Socket::IP and enabled IPv6 support.
+      - Updated bin/ scripts.
