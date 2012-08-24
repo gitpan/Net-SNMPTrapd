@@ -64,6 +64,8 @@ if (!$snmptrapd) {
     exit 1
 }
 
+printf "Listening on %s:%i\n", $snmptrapd->server->sockhost, $snmptrapd->server->sockport;
+
 while (1) {
     my $trap = $snmptrapd->get_trap();
 

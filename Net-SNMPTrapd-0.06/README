@@ -1,4 +1,4 @@
-Net-SNMPTrapd version 0.05
+Net-SNMPTrapd version 0.06
 ==========================
 
 INSTALLATION
@@ -15,7 +15,7 @@ DEPENDENCIES
 This module requires these other modules and libraries:
 
   Test::Simple
-  IO::Socket
+  IO::Socket::IP
   Convert::ASN1
 
   The test procedure requires Net::SNMP; however, if it is not found, 

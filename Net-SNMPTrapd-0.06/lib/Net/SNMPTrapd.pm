@@ -15,7 +15,7 @@ use Exporter;
 use IO::Socket::IP -register;
 use Convert::ASN1;
 
-our $VERSION     = '0.05';
+our $VERSION     = '0.06';
 our @ISA         = qw(Exporter);
 our @EXPORT      = qw();
 our %EXPORT_TAGS = (
@@ -336,6 +336,11 @@ sub process_trap {
     return bless $self, $class
 }
 
+sub server {
+    my $self = shift;
+    return $self->{'_UDPSERVER_'}
+}
+
 sub datagram {
     my ($self, $arg) = @_;
 
@@ -513,7 +518,7 @@ sub _InformRequest_Response {
                                      PeerAddr  => $$self->{'_TRAP_'}->{'PeerAddr'},
                                      PeerPort  => $$self->{'_TRAP_'}->{'PeerPort'},
                                      # LocalPort should be set, but creates error.
-                                     # Tried setting ReusePort on initial server, 
+                                     # Tried setting ReusePort on initial server,
                                      # but not implemented on Windows.  What to do?
                                      #LocalPort => SNMPTRAPD_DEFAULT_PORT,
                                      Family    => $$self->{'Family'}
@@ -594,13 +599,22 @@ Valid options are:
   -timeout   Timeout in seconds for socket               10
              operations and to wait for request
 
+Allows the following accessors to be called.
+
+=head3 server() - return IO::Socket::IP object for server
+
+  $snmptrapd->server();
+
+Return B<IO::Socket::IP> object for the created server.
+All B<IO::Socket::IP> accessors can then be called.
+
 =head2 get_trap() - listen for SNMP traps
 
   my $trap = $snmptrapd->get_trap([OPTIONS]);
 
-Listen for SNMP traps.  Timeout after default or user specified 
-timeout set in C<new> method and return '0'.  If trap is received 
-before timeout, return is defined.  Return is not defined if error 
+Listen for SNMP traps.  Timeout after default or user specified
+timeout set in C<new> method and return '0'.  If trap is received
+before timeout, return is defined.  Return is not defined if error
 encountered.
 
 Valid options are:
@@ -612,40 +626,40 @@ Valid options are:
              Keywords: 'RFC'         =  484
                        'recommended' = 1472
   -timeout   Timeout in seconds to wait for              10
-             request.  Overrides value set with 
+             request.  Overrides value set with
              new().
 
-Allows the following methods to be called.
+Allows the following accessors to be called.
 
 =head3 peeraddr() - return remote address from SNMP trap
 
   $trap->peeraddr();
 
-Return peer address value from a received (C<get_trap()>) 
-SNMP trap.  This is the address from the IP header on the UDP 
+Return peer address value from a received (C<get_trap()>)
+SNMP trap.  This is the address from the IP header on the UDP
 datagram.
 
 =head3 peerport() - return remote port from SNMP trap
 
   $trap->peerport();
 
-Return peer port value from a received (C<get_trap()>) 
-SNMP trap.  This is the port from the IP header on the UDP 
+Return peer port value from a received (C<get_trap()>)
+SNMP trap.  This is the port from the IP header on the UDP
 datagram.
 
 =head3 datagram() - return datagram from SNMP trap
 
   $trap->datagram([1]);
 
-Return the raw datagram from a received (C<get_trap()>) 
-SNMP trap.  This is ASN.1 encoded datagram.  For a hex 
+Return the raw datagram from a received (C<get_trap()>)
+SNMP trap.  This is ASN.1 encoded datagram.  For a hex
 dump, use the optional boolean argument.
 
 =head2 process_trap() - process received SNMP trap
 
   $trap->process_trap([OPTIONS]);
 
-Process a received SNMP trap.  Decodes the received (C<get_trap()>) 
+Process a received SNMP trap.  Decodes the received (C<get_trap()>)
 PDU.  Varbinds are extracted and decoded.  If PDU is SNMPv2
 InformRequest, the Response PDU is generated and sent to IP 
 address and UDP port found in the original datagram header 
@@ -678,7 +692,7 @@ or
                                        -noresponse => 1
                                       );
 
-In any instantiation, allows the following methods to be called.
+In any instantiation, allows the following accessors to be called.
 
 =head3 version() - return version from SNMP trap
 

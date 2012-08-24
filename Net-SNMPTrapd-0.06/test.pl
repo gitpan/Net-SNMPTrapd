@@ -3,9 +3,10 @@
 # `make test'. After `make install' it should work as `perl Net-SNMPTrapd.t'
 
 use strict;
-use Test::Simple tests => 4;
+use Test::Simple tests => 5;
 
-my $NUM_TESTS = 4;
+my $NUM_TESTS = 5;
+my $VERBOSE = 0;
 
 use Net::SNMPTrapd;
 ok(1, "Loading Module"); # If we made it this far, we're ok.
@@ -41,13 +42,14 @@ if (lc($answer) ne 'y') {
 sub start_server {
     my $snmptrapd = Net::SNMPTrapd->new();
     if (defined($snmptrapd)) {
-        return 0
+        return $snmptrapd
     } else {
         printf "Error: %s\nDo you have a SNMP Trap receiver listening already?\n  ('netstat -an | grep 162')\n", Net::SNMPTrapd->error;
-        return 1
+        return undef
     }
 }
-if (start_server() == 1) {
+my $snmptrapd = start_server();
+if (!defined($snmptrapd)) {
     ok(1, "Starting Server - Skipping remaining tests");
     for (3..$NUM_TESTS) {
         ok(1, "Skipping test ...")
@@ -59,7 +61,15 @@ if (start_server() == 1) {
 
 #########################
 # Test 3
-sub test3 {
+if ($snmptrapd->server->sockport == 162) {
+    ok(1, "server() accessor");
+} else {
+    ok(0, "server() accessor");
+}
+
+#########################
+# Test 4
+sub test4 {
 
     eval 'use Net::SNMP qw(:ALL)';
     if ($@) {
@@ -69,11 +79,6 @@ sub test3 {
 
     # Start Server
     my $FAILED = 0;
-    my $snmptrapd = Net::SNMPTrapd->new();
-    if (!defined($snmptrapd)) {
-        printf "Error: %s\n", Net::SNMPTrapd->error;
-        return 1
-    }
 
     # Fork: Server = Parent, Client = Child
     my $pid = fork();
@@ -197,6 +202,7 @@ sub test3 {
                 printf "Error: %s\n", Net::SNMPTrapd->error;
                 return 1
             } else {
+if ($VERBOSE) {
                 print "  -- $_ --\n";
                 print "  peeraddr  = "; if (defined($trap->peeraddr)      && ($trap->peeraddr eq "127.0.0.1"))              { printf "%s\n", $trap->peeraddr                           } else { printf "  !ERROR! - %s\n", $trap->peeraddr; $FAILED++ }
                 print "  peerport  = "; if (defined($trap->peerport)      && ($trap->peerport =~ /^\d{1,5}$/))              { printf "%s\n", $trap->peerport                           } else { printf "  !ERROR! - %s\n", $trap->peerport; $FAILED++ }
@@ -239,12 +245,13 @@ sub test3 {
                 print "  varbind   = "; if (defined($trap->varbinds->[8]->{'1.3.6.1.4.1.50000.1.9'})  && ($trap->varbinds->[8]->{'1.3.6.1.4.1.50000.1.9'} =~ /^\d+$/))             { printf "%s\n", $trap->varbinds->[8]->{'1.3.6.1.4.1.50000.1.9'}  } else { printf "  !ERROR! - %s\n", $trap->varbinds->[8]->{'1.3.6.1.4.1.50000.1.9'}; $FAILED++ }
                 print "  varbind   = "; if (defined($trap->varbinds->[9]->{'1.3.6.1.4.1.50000.1.10'}) && ($trap->varbinds->[9]->{'1.3.6.1.4.1.50000.1.10'} eq 'opaque data'))      { printf "%s\n", $trap->varbinds->[9]->{'1.3.6.1.4.1.50000.1.10'} } else { printf "  !ERROR! - %s\n", $trap->varbinds->[9]->{'1.3.6.1.4.1.50000.1.10'}; $FAILED++ }
                 }
+}
             }
         }
     }
     return $FAILED
 }
-my $result = test3();
+my $result = test4();
 if ($result == 0) {
     ok(1, "Received Message")
 } elsif ($result == 255) {
@@ -253,9 +260,11 @@ if ($result == 0) {
     ok(0, "Received Message")
 }
 
+$snmptrapd = undef;
+
 #########################
-# Test 4
-sub test4 {
+# Test 5
+sub test5 {
 
     eval 'use Net::SNMP qw(:ALL)';
     if ($@) {
@@ -265,10 +274,13 @@ sub test4 {
 
     # Start Server
     my $FAILED = 0;
-    my $snmptrapd = IO::Socket::INET->new(
+
+    use IO::Socket::IP -register;
+    my $snmptrapd = IO::Socket::IP->new(
                                           'Proto'     => 'udp',
                                           'LocalPort' => 162,
-                                          'Timeout'   => 10
+                                          'Timeout'   => 10,
+                                          'Family'    => AF_INET
                                          );
 
     if (!defined($snmptrapd)) {
@@ -324,7 +336,9 @@ sub test4 {
         my $trap;
         if (!defined($trap = Net::SNMPTrapd->process_trap($buffer))) {
             if ((my $error = sprintf "%s", Net::SNMPTrapd->error) eq "Error sending InformRequest Response - Peer Addr undefined") {
+if ($VERBOSE) {
                 printf "  -- Datagram with no address --\n  %s\n", Net::SNMPTrapd->error
+}
             } else {
                 return 1
             }
@@ -334,13 +348,14 @@ sub test4 {
             printf "Error: %s\n", Net::SNMPTrapd->error;
             return 1
         } else {
+if ($VERBOSE) {
             print "  -- process_trap() as sub --\n";
             print "  version   = "; if (defined($trap->version)       && ($trap->version =~ /^[12]$/))                  { printf "%s\n", $trap->version       } else { printf "  !ERROR! - %s\n", $trap->version;   $FAILED++ }
             print "  community = "; if (defined($trap->community)     && ($trap->community eq 'public'))                { printf "%s\n", $trap->community     } else { printf "  !ERROR! - %s\n", $trap->community; $FAILED++ }
             print "  pdu_type  = "; if (defined($trap->pdu_type)      && ($trap->pdu_type(1) =~ /^[467]$/))             { printf "%s\n", $trap->pdu_type;     } else { printf "  !ERROR! - %s\n", $trap->pdu_type;  $FAILED++ }
-            print "  requestID = "; if (defined($trap->request_ID)    && ($trap->request_ID =~ /^\d+$/))                { printf "%s\n", $trap->request_ID    } else { printf "  !ERROR! - %s\n", $trap->request_ID;   $FAILED++ } 
-            print "  errorstat = "; if (defined($trap->error_status)  && ($trap->error_status =~ /^\d+$/))              { printf "%s\n", $trap->error_status  } else { printf "  !ERROR! - %s\n", $trap->error_status; $FAILED++ } 
-            print "  errorindx = "; if (defined($trap->error_index)   && ($trap->error_index =~ /^\d+$/))               { printf "%s\n", $trap->error_index   } else { printf "  !ERROR! - %s\n", $trap->error_index;  $FAILED++ } 
+            print "  requestID = "; if (defined($trap->request_ID)    && ($trap->request_ID =~ /^\d+$/))                { printf "%s\n", $trap->request_ID    } else { printf "  !ERROR! - %s\n", $trap->request_ID;   $FAILED++ }
+            print "  errorstat = "; if (defined($trap->error_status)  && ($trap->error_status =~ /^\d+$/))              { printf "%s\n", $trap->error_status  } else { printf "  !ERROR! - %s\n", $trap->error_status; $FAILED++ }
+            print "  errorindx = "; if (defined($trap->error_index)   && ($trap->error_index =~ /^\d+$/))               { printf "%s\n", $trap->error_index   } else { printf "  !ERROR! - %s\n", $trap->error_index;  $FAILED++ }
             print "  varbind   = "; if (defined($trap->varbinds->[0]->{'1.3.6.1.2.1.1.3.0'})      && ($trap->varbinds->[0]->{'1.3.6.1.2.1.1.3.0'} =~ /^\d+$/))                 { printf "%s\n", $trap->varbinds->[0]->{'1.3.6.1.2.1.1.3.0'}      } else { printf "  !ERROR! - %s\n", $trap->varbinds->[0]->{'1.3.6.1.2.1.1.3.0'}; $FAILED++ }
             print "  varbind   = "; if (defined($trap->varbinds->[1]->{'1.3.6.1.6.3.1.1.4.1.0'})  && ($trap->varbinds->[1]->{'1.3.6.1.6.3.1.1.4.1.0'} eq '1.3.6.1.4.1.50000')) { printf "%s\n", $trap->varbinds->[1]->{'1.3.6.1.6.3.1.1.4.1.0'}  } else { printf "  !ERROR! - %s\n", $trap->varbinds->[1]->{'1.3.6.1.6.3.1.1.4.1.0'}; $FAILED++ }
             print "  varbind   = "; if (defined($trap->varbinds->[2]->{'1.3.6.1.4.1.50000.1.3'})  && ($trap->varbinds->[2]->{'1.3.6.1.4.1.50000.1.3'} == 1))                   { printf "%s\n", $trap->varbinds->[2]->{'1.3.6.1.4.1.50000.1.3'}  } else { printf "  !ERROR! - %s\n", $trap->varbinds->[2]->{'1.3.6.1.4.1.50000.1.3'}; $FAILED++ }
@@ -351,6 +366,7 @@ sub test4 {
             print "  varbind   = "; if (defined($trap->varbinds->[7]->{'1.3.6.1.4.1.50000.1.8'})  && ($trap->varbinds->[7]->{'1.3.6.1.4.1.50000.1.8'} == 42424242))            { printf "%s\n", $trap->varbinds->[7]->{'1.3.6.1.4.1.50000.1.8'}  } else { printf "  !ERROR! - %s\n", $trap->varbinds->[7]->{'1.3.6.1.4.1.50000.1.8'}; $FAILED++ }
             print "  varbind   = "; if (defined($trap->varbinds->[8]->{'1.3.6.1.4.1.50000.1.9'})  && ($trap->varbinds->[8]->{'1.3.6.1.4.1.50000.1.9'} =~ /^\d+$/))             { printf "%s\n", $trap->varbinds->[8]->{'1.3.6.1.4.1.50000.1.9'}  } else { printf "  !ERROR! - %s\n", $trap->varbinds->[8]->{'1.3.6.1.4.1.50000.1.9'}; $FAILED++ }
             print "  varbind   = "; if (defined($trap->varbinds->[9]->{'1.3.6.1.4.1.50000.1.10'}) && ($trap->varbinds->[9]->{'1.3.6.1.4.1.50000.1.10'} eq 'opaque data'))      { printf "%s\n", $trap->varbinds->[9]->{'1.3.6.1.4.1.50000.1.10'} } else { printf "  !ERROR! - %s\n", $trap->varbinds->[9]->{'1.3.6.1.4.1.50000.1.10'}; $FAILED++ }
+}
         }
 
         my ($rin, $rout, $ein, $eout) = ('', '', '', '');
@@ -359,17 +375,23 @@ sub test4 {
         # check if a message is waiting
         if (select($rout=$rin, undef, $eout=$ein, 10)) {
             if ($snmptrapd->recv($buffer, 1500)) {
-                print "  -- Received extra InformRequest due to -noresponse --\n"
+if ($VERBOSE) {
+                print "  -- OK! Received extra InformRequest due to -noresponse --\n"
+}
             } else {
-                print "  -- recv() error waiting for extra InformRequest --\n"
+if ($VERBOSE) {
+                print "  -- FAIL! recv() error waiting for extra InformRequest --\n"
+}
             }
         } else {
-            print "  -- Did *NOT* receive extra InformRequest --\n"
+if ($VERBOSE) {
+            print "  -- FAIL! Did *NOT* receive extra InformRequest --\n"
+}
         }
     }
     return $FAILED
 }
-$result = test4();
+$result = test5();
 if ($result == 0) {
     ok(1, "Process as sub")
 } elsif ($result == 255) {

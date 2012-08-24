@@ -13,7 +13,7 @@ Revision history for Perl extension Net::SNMPTrapd.
         every other version of build - including CPAN Testers 
         had NO issues whatsoever.
 
-0.04  Thu Oct  21 12:00:00 2010
+0.04  Thu Oct 21 12:00:00 2010
       - Based on request user request, implemented parsing and 
         response for SNMPv2 InformRequest PDUs.
       - Added the pdu_type method.
@@ -29,6 +29,9 @@ Revision history for Perl extension Net::SNMPTrapd.
         debug subroutines directly for ASN.1 decode troubleshooting.
       - More detailed error messages and more code comments.
 
-0.05  Thu Aug  23 19:00:00 2012
+0.05  Thu Aug 23 19:00:00 2012
       - Changed to IO::Socket::IP and enabled IPv6 support.
       - Updated bin/ scripts.
+
+0.06  Fri Aug 24 12:00:00 2012
+      - Added server() accessor.

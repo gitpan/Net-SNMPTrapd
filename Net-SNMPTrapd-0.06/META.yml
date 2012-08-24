@@ -21,4 +21,4 @@ requires:
   Convert::ASN1: 0.22
   IO::Socket::IP: 0.16
   Test::Simple: 0
-version: 0.05
+version: 0.06
