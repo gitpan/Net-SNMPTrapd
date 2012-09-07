@@ -3,7 +3,9 @@
 # `make test'. After `make install' it should work as `perl Net-SNMPTrapd.t'
 
 use strict;
+use warnings;
 use Test::Simple tests => 5;
+use ExtUtils::MakeMaker qw(prompt);
 
 my $NUM_TESTS = 5;
 my $VERBOSE = 0;
@@ -26,9 +28,7 @@ print <<STOP;
 
 STOP
 
-print "Continue with tests? ('y' and 'Enter')  : ";
-my $answer = <STDIN>;
-chomp $answer;
+my $answer = prompt("Continue with tests? ('y' and 'Enter')", 'n');
 
 if (lc($answer) ne 'y') {
     for (2..$NUM_TESTS) {
