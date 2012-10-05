@@ -84,8 +84,8 @@ while (1) {
             $p = $trap->datagram(1)
         } else {
             $p = sprintf "%s\t%i\t%i\t%s\t%s\t", 
-                             $trap->peeraddr, 
-                             $trap->peerport, 
+                             $trap->remoteaddr, 
+                             $trap->remoteport, 
                              $trap->version, 
                              $trap->community,
                              $trap->pdu_type;

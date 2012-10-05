@@ -11,17 +11,26 @@ require 5.005;
 
 use strict;
 use Exporter;
-
-use IO::Socket::IP -register;
 use Convert::ASN1;
+use Socket 1.87 qw(AF_INET AF_INET6 inet_ntoa);
 
-our $VERSION     = '0.07';
+our $VERSION     = '0.08';
 our @ISA         = qw(Exporter);
 our @EXPORT      = qw();
 our %EXPORT_TAGS = (
                     'all' => [qw()]
                    );
 our @EXPORT_OK   = (@{$EXPORT_TAGS{'all'}});
+
+my $HAVE_IO_Socket_IP = 0;
+eval "use IO::Socket::IPP -register";
+if(!$@) {
+    $HAVE_IO_Socket_IP = 1;
+    push @ISA, "IO::Socket::IP"
+} else {
+    require IO::Socket::INET;
+    push @ISA, "IO::Socket::INET";
+}
 
 ########################################################
 # Start Variables
@@ -65,10 +74,13 @@ sub new {
             } elsif (/^-?localaddr$/i) {
                 $params{'LocalAddr'} = $cfg{$_}
             } elsif (/^-?family$/i) {
-                if ($cfg{$_} =~ /^[46]$/) {
-                    if ($cfg{$_} == 4) {
+                 if ($cfg{$_} =~ /^(?:(?:(:?ip)?v?(?:4|6))|${\AF_INET}|${\AF_INET6})$/) {
+                    if ($cfg{$_} =~ /^(?:(?:(:?ip)?v?4)|${\AF_INET})$/) {
                         $params{'Family'} = AF_INET
                     } else {
+                        if (!$HAVE_IO_Socket_IP) {
+                            $LASTERROR = "IO::Socket::IP required for IPv6"
+                        }
                         $params{'Family'} = AF_INET6
                     }
                 } else {
@@ -86,7 +98,7 @@ sub new {
         }
     }
 
-    if (my $udpserver = IO::Socket::IP->new(%params)) {
+    if (my $udpserver = $class->SUPER::new(%params)) {
         return bless {
                       %params,         # merge user parameters
                       '_UDPSERVER_' => $udpserver
@@ -155,13 +167,13 @@ sub get_trap {
         # read the message
         if ($udpserver->recv($datagram, $datagramsize)) {
 
-            $trap->{'_TRAP_'}{'PeerPort'} = $udpserver->peerport;
-            $trap->{'_TRAP_'}{'PeerAddr'} = $udpserver->peerhost;
+            $trap->{'_TRAP_'}{'PeerPort'} = $udpserver->SUPER::peerport;
+            $trap->{'_TRAP_'}{'PeerAddr'} = $udpserver->SUPER::peerhost;
             $trap->{'_TRAP_'}{'datagram'} = $datagram;
 
             return bless $trap, $class
         } else {
-            $LASTERROR = sprintf "Socket RECV error: %s", $udpserver->sockopt(SO_ERROR);
+            $LASTERROR = sprintf "Socket RECV error: $!";
             return(undef)
         }
     } else {
@@ -351,12 +363,12 @@ sub datagram {
     }
 }
 
-sub peeraddr {
+sub remoteaddr {
     my $self = shift;
     return $self->{'_TRAP_'}{'PeerAddr'}
 }
 
-sub peerport {
+sub remoteport {
     my $self = shift;
     return $self->{'_TRAP_'}{'PeerPort'}
 }
@@ -476,6 +488,7 @@ sub dump {
 sub _InformRequest_Response {
 
     my ($self, $trap1, $pdutype) = @_;
+    my $class = ref($$self) || $$self;
 
     my $asn = new Convert::ASN1;
     $asn->prepare("
@@ -513,7 +526,7 @@ sub _InformRequest_Response {
         return "Peer Port undefined"
     }
 
-    my $socket = IO::Socket::IP->new(
+    my $socket = $class->SUPER::new(
                                      Proto     => "udp",
                                      PeerAddr  => $$self->{'_TRAP_'}->{'PeerAddr'},
                                      PeerPort  => $$self->{'_TRAP_'}->{'PeerPort'},
@@ -565,8 +578,8 @@ Net::SNMPTrapd - Perl implementation of SNMP Trap Listener
           printf "$0: %s\n", Net::SNMPTrapd->error
       } else {
           printf "%s\t%i\t%i\t%s\n", 
-                 $trap->peeraddr, 
-                 $trap->peerport, 
+                 $trap->remoteaddr, 
+                 $trap->remoteport, 
                  $trap->version, 
                  $trap->community
       }
@@ -592,13 +605,19 @@ Valid options are:
 
   Option     Description                            Default
   ------     -----------                            -------
-  -Family    Address family IPv4/IPv6                     4
-             given as integer 4 or 6
+  -Family    Address family IPv4/IPv6                  IPv4
+               Valid values for IPv4:
+                 4, v4, ip4, ipv4, AF_INET (constant)
+               Valid values for IPv6:
+                 6, v6, ip6, ipv6, AF_INET6 (constant)
   -LocalAddr Interface to bind to                       any
   -LocalPort Port to bind server to                     162
   -timeout   Timeout in seconds for socket               10
              operations and to wait for request
 
+B<NOTE>:  IPv6 requires B<IO::Socket::IP>.  Failback is B<IO::Socket::INET> 
+and only IPv4 support.
+             
 Allows the following accessors to be called.
 
 =head3 server() - return IO::Socket::IP object for server
@@ -631,19 +650,19 @@ Valid options are:
 
 Allows the following accessors to be called.
 
-=head3 peeraddr() - return remote address from SNMP trap
+=head3 remoteaddr() - return remote address from SNMP trap
 
-  $trap->peeraddr();
+  $trap->remoteaddr();
 
-Return peer address value from a received (C<get_trap()>)
+Return remote address value from a received (C<get_trap()>)
 SNMP trap.  This is the address from the IP header on the UDP
 datagram.
 
-=head3 peerport() - return remote port from SNMP trap
+=head3 remoteport() - return remote port from SNMP trap
 
-  $trap->peerport();
+  $trap->remoteport();
 
-Return peer port value from a received (C<get_trap()>)
+Return remote port value from a received (C<get_trap()>)
 SNMP trap.  This is the port from the IP header on the UDP
 datagram.
 
@@ -663,7 +682,7 @@ Process a received SNMP trap.  Decodes the received (C<get_trap()>)
 PDU.  Varbinds are extracted and decoded.  If PDU is SNMPv2
 InformRequest, the Response PDU is generated and sent to IP 
 address and UDP port found in the original datagram header 
-(C<get_trap()> methods C<peeraddr()> and C<peerport()>).
+(C<get_trap()> methods C<remoteaddr()> and C<remoteport()>).
 
 Called with one argument, interpreted as the datagram to process.  
 Valid options are:

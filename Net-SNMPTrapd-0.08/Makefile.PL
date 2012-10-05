@@ -8,7 +8,6 @@ WriteMakefile(
     EXE_FILES         => ['bin/snmptrapd-simple.pl',
                           'bin/snmptrapd-sendtest.pl'],
     PREREQ_PM         => {Test::Simple => 0,
-                          IO::Socket::IP => 0.16,
                           Convert::ASN1 => 0.22 }, # e.g., Module::Name => 1.1
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Net/SNMPTrapd.pm', # retrieve abstract from module

@@ -8,24 +8,24 @@ Revision history for Perl extension Net::SNMPTrapd.
       - Allowed legacy and case insensitive calling of switches.
 
 0.03  Mon Feb  5 09:29:48 2010
-      - Updated tests to address Activestate auto-building of PPM 
-        which threw an error even though one didn't exist and 
-        every other version of build - including CPAN Testers 
+      - Updated tests to address Activestate auto-building of PPM
+        which threw an error even though one didn't exist and
+        every other version of build - including CPAN Testers
         had NO issues whatsoever.
 
 0.04  Thu Oct 21 12:00:00 2010
-      - Based on request user request, implemented parsing and 
+      - Based on request user request, implemented parsing and
         response for SNMPv2 InformRequest PDUs.
       - Added the pdu_type method.
       - Updated Convert::ASN1 structures used in module.
       - Updated bin/ scripts.
-      - Updated test.pl script to test for InformRequest and 
+      - Updated test.pl script to test for InformRequest and
         Response.
       - Increased default PDU size to 65467.
       - Added PDU size and timeout options to get_trap() method.
         Provided options for RFC and recommended PDU sizes.
       - Added hex dump option to datagram() method.
-      - Added dump() method/subroutine to use the Convert::ASN1 
+      - Added dump() method/subroutine to use the Convert::ASN1
         debug subroutines directly for ASN.1 decode troubleshooting.
       - More detailed error messages and more code comments.
 
@@ -38,3 +38,9 @@ Revision history for Perl extension Net::SNMPTrapd.
 
 0.07  Tue Sep  4 12:00:00 2012
       - Timeout on advanced tests with EU::MM prompt().
+
+0.08  Thu Oct  4 23:59:00 2012
+      - Make IO::Socket::IP optional with failback to IP::Socket::INET
+        with SUPER.
+      - Changed peeraddr(), peerport() accessors to remoteaddr(),
+        remoteport() to remove conflict with IO::Socket::*.
