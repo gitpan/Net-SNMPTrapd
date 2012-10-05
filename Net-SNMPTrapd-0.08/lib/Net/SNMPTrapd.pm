@@ -23,7 +23,7 @@ our %EXPORT_TAGS = (
 our @EXPORT_OK   = (@{$EXPORT_TAGS{'all'}});
 
 my $HAVE_IO_Socket_IP = 0;
-eval "use IO::Socket::IPP -register";
+eval "use IO::Socket::IP -register";
 if(!$@) {
     $HAVE_IO_Socket_IP = 1;
     push @ISA, "IO::Socket::IP"
@@ -79,7 +79,8 @@ sub new {
                         $params{'Family'} = AF_INET
                     } else {
                         if (!$HAVE_IO_Socket_IP) {
-                            $LASTERROR = "IO::Socket::IP required for IPv6"
+                            $LASTERROR = "IO::Socket::IP required for IPv6";
+                            return(undef)
                         }
                         $params{'Family'} = AF_INET6
                     }
