@@ -55,9 +55,9 @@ if (defined($opt{interface})) {
 }
 
 my $snmptrapd = Net::SNMPTrapd->new(
-                                    LocalPort => $opt{interface},
-                                    Family    => $family
-                                   );
+    LocalPort => $opt{interface},
+    Family    => $family
+);
 
 if (!$snmptrapd) {
     printf "$0: Error creating SNMPTrapd listener: %s", Net::SNMPTrapd->error;

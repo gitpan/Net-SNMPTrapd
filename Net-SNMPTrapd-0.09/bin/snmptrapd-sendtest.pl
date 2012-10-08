@@ -58,12 +58,12 @@ $opt{inform}    = $opt{inform}    || 0;
 for my $host (@ARGV) {
 
     my ($session, $error) = Net::SNMP->session(
-                                               -hostname  => $host,
-                                               -version   => $opt{version},
-                                               -community => $opt{community},
-                                               -domain    => $family,
-                                               -port      => SNMP_TRAP_PORT
-                                              );
+        -hostname  => $host,
+        -version   => $opt{version},
+        -community => $opt{community},
+        -domain    => $family,
+        -port      => SNMP_TRAP_PORT
+    );
 
     if (!defined($session)) {
        printf "Error: Starting SNMP session - %s\n", $error;

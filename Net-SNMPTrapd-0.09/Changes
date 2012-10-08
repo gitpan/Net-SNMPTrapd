@@ -44,3 +44,6 @@ Revision history for Perl extension Net::SNMPTrapd.
         with SUPER.
       - Changed peeraddr(), peerport() accessors to remoteaddr(),
         remoteport() to remove conflict with IO::Socket::*.
+
+0.09  Sun Oct  7 21:30:00 2012
+      - Require Socket 1.87.

@@ -14,7 +14,7 @@ use Exporter;
 use Convert::ASN1;
 use Socket 1.87 qw(AF_INET AF_INET6 inet_ntoa);
 
-our $VERSION     = '0.08';
+our $VERSION     = '0.09';
 our @ISA         = qw(Exporter);
 our @EXPORT      = qw();
 our %EXPORT_TAGS = (

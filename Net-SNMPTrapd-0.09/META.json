@@ -33,10 +33,11 @@
       "runtime" : {
          "requires" : {
             "Convert::ASN1" : "0.22",
+            "Socket" : "1.87",
             "Test::Simple" : "0"
          }
       }
    },
    "release_status" : "stable",
-   "version" : "0.08"
+   "version" : "0.09"
 }
