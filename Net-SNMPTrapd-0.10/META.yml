@@ -1,5 +1,5 @@
 ---
-abstract: Perl implementation of SNMP Trap Listener
+abstract: 'Perl implementation of SNMP Trap Listener'
 author:
   - 'Michael Vincent <vin at vinsworld dot com>'
 build_requires:
@@ -19,6 +19,6 @@ no_index:
     - inc
 requires:
   Convert::ASN1: 0.22
-  Socket: 1.87
+  Socket: 0
   Test::Simple: 0
-version: 0.09
+version: 0.10

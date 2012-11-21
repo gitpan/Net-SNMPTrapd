@@ -47,3 +47,6 @@ Revision history for Perl extension Net::SNMPTrapd.
 
 0.09  Sun Oct  7 21:30:00 2012
       - Require Socket 1.87.
+
+0.10  Tue Noc 20 21:30:00 2012
+      - Any Socket will do, fixed inet_ntoa issue with IPv6 in version 1.

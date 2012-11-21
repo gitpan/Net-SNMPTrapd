@@ -12,9 +12,12 @@ require 5.005;
 use strict;
 use Exporter;
 use Convert::ASN1;
-use Socket 1.87 qw(AF_INET AF_INET6 inet_ntoa);
+use Socket qw(inet_ntoa AF_INET IPPROTO_TCP);
 
-our $VERSION     = '0.09';
+my $AF_INET6 = eval { Socket::AF_INET6() };
+my $NI_NUMERICHOST = eval { Socket::NI_NUMERICHOST() };
+
+our $VERSION     = '0.10';
 our @ISA         = qw(Exporter);
 our @EXPORT      = qw();
 our %EXPORT_TAGS = (
@@ -74,7 +77,7 @@ sub new {
             } elsif (/^-?localaddr$/i) {
                 $params{'LocalAddr'} = $cfg{$_}
             } elsif (/^-?family$/i) {
-                 if ($cfg{$_} =~ /^(?:(?:(:?ip)?v?(?:4|6))|${\AF_INET}|${\AF_INET6})$/) {
+                 if ($cfg{$_} =~ /^(?:(?:(:?ip)?v?(?:4|6))|${\AF_INET}|$AF_INET6)$/) {
                     if ($cfg{$_} =~ /^(?:(?:(:?ip)?v?4)|${\AF_INET})$/) {
                         $params{'Family'} = AF_INET
                     } else {
@@ -82,7 +85,7 @@ sub new {
                             $LASTERROR = "IO::Socket::IP required for IPv6";
                             return(undef)
                         }
-                        $params{'Family'} = AF_INET6
+                        $params{'Family'} = $AF_INET6
                     }
                 } else {
                     $LASTERROR = "Invalid family - $cfg{$_}";
@@ -316,11 +319,11 @@ sub process_trap {
 
     # v1
     if ($trap1->{'version'} == 0) {
-        $self->{'_TRAP_'}{'ent_OID'}       =           $trap1->{'pdu_type'}->{$pdutype}->{'ent_OID'};
-        $self->{'_TRAP_'}{'agentaddr'}     = inet_ntoa($trap1->{'pdu_type'}->{$pdutype}->{'agentaddr'});
-        $self->{'_TRAP_'}{'generic_trap'}  =           $trap1->{'pdu_type'}->{$pdutype}->{'generic_trap'};
-        $self->{'_TRAP_'}{'specific_trap'} =           $trap1->{'pdu_type'}->{$pdutype}->{'specific_trap'};
-        $self->{'_TRAP_'}{'timeticks'}     =           $trap1->{'pdu_type'}->{$pdutype}->{'timeticks'};
+        $self->{'_TRAP_'}{'ent_OID'}       =          $trap1->{'pdu_type'}->{$pdutype}->{'ent_OID'};
+        $self->{'_TRAP_'}{'agentaddr'}     = inetNtoa($trap1->{'pdu_type'}->{$pdutype}->{'agentaddr'});
+        $self->{'_TRAP_'}{'generic_trap'}  =          $trap1->{'pdu_type'}->{$pdutype}->{'generic_trap'};
+        $self->{'_TRAP_'}{'specific_trap'} =          $trap1->{'pdu_type'}->{$pdutype}->{'specific_trap'};
+        $self->{'_TRAP_'}{'timeticks'}     =          $trap1->{'pdu_type'}->{$pdutype}->{'timeticks'};
 
     # v2c
     } elsif ($trap1->{'version'} == 1) {
@@ -337,7 +340,7 @@ sub process_trap {
             $oidval{$trap2->{'varbind'}[$i]->{'oid'}} = (
                                                          defined($trap2->{'varbind'}[$i]->{'choice'}{$_}) ? 
                                                            (($_ eq 'val_IpAddr') ? 
-                                                             inet_ntoa($trap2->{'varbind'}[$i]->{'choice'}{$_}) : 
+                                                             inetNtoa($trap2->{'varbind'}[$i]->{'choice'}{$_}) : 
                                                            $trap2->{'varbind'}[$i]->{'choice'}{$_}) : 
                                                          ""
                                                         )
@@ -540,6 +543,33 @@ sub _InformRequest_Response {
     $socket->send($buffer);
     close $socket;
     return ("OK")
+}
+
+sub inetNtoa {
+    my ($addr) = @_;
+
+    if ($Socket::VERSION >= 1.94) {
+        my $name;
+        if (length($addr) == 4) {
+            $name = pack_sockaddr_in(0, $addr)
+        } else {
+            $name = pack_sockaddr_in6(0, $addr)
+        }
+        my ($err, $address) = Socket::getnameinfo($name, $NI_NUMERICHOST);
+        if (defined($address)) {
+            return $address
+        } else {
+            $LASTERROR = "getnameinfo($addr) failed - $err";
+            return undef
+        }
+    } else {
+        if (length($addr) == 4) {
+            return inet_ntoa($addr)
+        } else {
+            # Poor man's IPv6
+            return join ':', (unpack '(a4)*', unpack ('H*', $addr))
+        }
+    }
 }
 
 ########################################################

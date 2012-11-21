@@ -9,7 +9,7 @@ WriteMakefile(
                           'bin/snmptrapd-sendtest.pl'],
     PREREQ_PM         => {Test::Simple => 0,
                           Convert::ASN1 => 0.22,
-                          Socket => 1.87 }, # e.g., Module::Name => 1.1
+                          Socket => 0 }, # e.g., Module::Name => 1.1
     ($] >= 5.005 ?     ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM  => 'lib/Net/SNMPTrapd.pm', # retrieve abstract from module
        AUTHOR         => 'Michael Vincent <vin at vinsworld dot com>') : ()),

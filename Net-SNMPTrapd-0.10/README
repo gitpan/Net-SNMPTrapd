@@ -1,4 +1,4 @@
-Net-SNMPTrapd version 0.09
+Net-SNMPTrapd version 0.10
 ==========================
 
 INSTALLATION
@@ -14,7 +14,7 @@ DEPENDENCIES
 
 This module requires these other modules and libraries:
 
-  Socket 1.87
+  Socket (requires 1.94 for IPv6)
   IO::Socket::IP (for IPv6 support)
   Convert::ASN1
   Test::Simple
