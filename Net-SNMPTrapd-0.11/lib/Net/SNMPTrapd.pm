@@ -17,7 +17,7 @@ use Socket qw(inet_ntoa AF_INET IPPROTO_TCP);
 my $AF_INET6 = eval { Socket::AF_INET6() };
 my $NI_NUMERICHOST = eval { Socket::NI_NUMERICHOST() };
 
-our $VERSION     = '0.10';
+our $VERSION     = '0.11';
 our @ISA         = qw(Exporter);
 our @EXPORT      = qw();
 our %EXPORT_TAGS = (
@@ -551,9 +551,9 @@ sub inetNtoa {
     if ($Socket::VERSION >= 1.94) {
         my $name;
         if (length($addr) == 4) {
-            $name = pack_sockaddr_in(0, $addr)
+            $name = Socket::pack_sockaddr_in(0, $addr)
         } else {
-            $name = pack_sockaddr_in6(0, $addr)
+            $name = Socket::pack_sockaddr_in6(0, $addr)
         }
         my ($err, $address) = Socket::getnameinfo($name, $NI_NUMERICHOST);
         if (defined($address)) {
