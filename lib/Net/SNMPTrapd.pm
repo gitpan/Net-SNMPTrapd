@@ -17,7 +17,7 @@ use Socket qw(inet_ntoa AF_INET IPPROTO_TCP);
 my $AF_INET6 = eval { Socket::AF_INET6() };
 my $NI_NUMERICHOST = eval { Socket::NI_NUMERICHOST() };
 
-our $VERSION     = '0.11';
+our $VERSION     = '0.12';
 our @ISA         = qw(Exporter);
 our @EXPORT      = qw();
 our %EXPORT_TAGS = (
@@ -46,6 +46,64 @@ use constant SNMPTRAPD_MAX_SIZE     => 65467; # Actual limit (65535 - IP/UDP)
 our @TRAPTYPES = qw(COLDSTART WARMSTART LINKDOWN LINKUP AUTHFAIL EGPNEIGHBORLOSS ENTERPRISESPECIFIC);
 our @PDUTYPES  = qw(GetRequest GetNextRequest Response SetRequest Trap GetBulkRequest InformRequest SNMPv2-Trap Report);
 our $LASTERROR;
+
+my $asn = Convert::ASN1->new;
+$asn->prepare("
+    PDU ::= SEQUENCE {
+        version   INTEGER,
+        community STRING,
+        pdu_type  PDUs
+    }
+    PDUs ::= CHOICE {
+        response        Response_PDU,
+        trap            Trap_PDU,
+        inform_request  InformRequest_PDU,
+        snmpv2_trap     SNMPv2_Trap_PDU
+    }
+    Response_PDU      ::= [2] IMPLICIT PDUv2
+    Trap_PDU          ::= [4] IMPLICIT PDUv1
+    InformRequest_PDU ::= [6] IMPLICIT PDUv2
+    SNMPv2_Trap_PDU   ::= [7] IMPLICIT PDUv2
+
+    IPAddress ::= [APPLICATION 0] STRING
+    Counter32 ::= [APPLICATION 1] INTEGER
+    Guage32   ::= [APPLICATION 2] INTEGER
+    TimeTicks ::= [APPLICATION 3] INTEGER
+    Opaque    ::= [APPLICATION 4] STRING
+    Counter64 ::= [APPLICATION 6] INTEGER
+
+    PDUv1 ::= SEQUENCE {
+        ent_oid         OBJECT IDENTIFIER,
+        agent_addr      IPAddress,
+        generic_trap    INTEGER,
+        specific_trap   INTEGER,
+        timeticks       TimeTicks,
+        varbindlist     VARBINDS
+    }
+    PDUv2 ::= SEQUENCE {
+        request_id      INTEGER,
+        error_status    INTEGER,
+        error_index     INTEGER,
+        varbindlist     VARBINDS
+    }
+    VARBINDS ::= SEQUENCE OF SEQUENCE {
+        oid    OBJECT IDENTIFIER,
+        value  CHOICE {
+            integer   INTEGER,
+            string    STRING,
+            oid       OBJECT IDENTIFIER,
+            ipaddr    IPAddress,
+            counter32 Counter32,
+            guage32   Guage32,
+            timeticks TimeTicks,
+            opaque    Opaque,
+            counter64 Counter64,
+            null      NULL
+        }
+    }
+");
+our $snmpasn = $asn->find('PDU');
+
 ########################################################
 # End Variables
 ########################################################
@@ -162,28 +220,30 @@ sub get_trap {
     my $udpserver = $self->{'_UDPSERVER_'};
     my $datagram;
 
-    # vars for IO select
-    my ($rin, $rout, $ein, $eout) = ('', '', '', '');
-    vec($rin, fileno($udpserver), 1) = 1;
+    if ($Timeout != 0) {
+        # vars for IO select
+        my ($rin, $rout, $ein, $eout) = ('', '', '', '');
+        vec($rin, fileno($udpserver), 1) = 1;
 
-    # check if a message is waiting
-    if (select($rout=$rin, undef, $eout=$ein, $Timeout)) {
-        # read the message
-        if ($udpserver->recv($datagram, $datagramsize)) {
-
-            $trap->{'_TRAP_'}{'PeerPort'} = $udpserver->SUPER::peerport;
-            $trap->{'_TRAP_'}{'PeerAddr'} = $udpserver->SUPER::peerhost;
-            $trap->{'_TRAP_'}{'datagram'} = $datagram;
-
-            return bless $trap, $class
-        } else {
-            $LASTERROR = sprintf "Socket RECV error: $!";
-            return(undef)
+        # check if a message is waiting
+        if (! select($rout=$rin, undef, $eout=$ein, $Timeout)) {
+            $LASTERROR = "Timed out waiting for datagram";
+            return(0)
         }
-    } else {
-        $LASTERROR = "Timed out waiting for datagram";
-        return(0)
     }
+
+    # read the message
+    if ($udpserver->recv($datagram, $datagramsize)) {
+
+        $trap->{'_TRAP_'}{'PeerPort'} = $udpserver->SUPER::peerport;
+        $trap->{'_TRAP_'}{'PeerAddr'} = $udpserver->SUPER::peerhost;
+        $trap->{'_TRAP_'}{'datagram'} = $datagram;
+
+        return bless $trap, $class
+    }
+
+    $LASTERROR = sprintf "Socket RECV error: $!";
+    return(undef)
 }
 
 sub process_trap {
@@ -222,128 +282,79 @@ sub process_trap {
         }
     }
 
-    my $asn = new Convert::ASN1;
-
-    ### Process first part of PDU (excluding varbinds)
-    my $trap1;
-    $asn->prepare("
-        PDU ::= SEQUENCE {
-            version   INTEGER,
-            community STRING,
-            pdu_type  PDUs
-        }
-        PDUs ::= CHOICE {
-            trap           Trap-PDU,
-            inform-request InformRequest-PDU,
-            snmpv2-trap    SNMPv2-Trap-PDU
-        }
-        Trap-PDU          ::= [4] IMPLICIT PDUv1
-        InformRequest-PDU ::= [6] IMPLICIT PDUv2
-        SNMPv2-Trap-PDU   ::= [7] IMPLICIT PDUv2
-        PDUv1 ::= SEQUENCE {
-            ent_OID         OBJECT IDENTIFIER,
-            agentaddr       [APPLICATION 0] STRING,
-            generic_trap    INTEGER,
-            specific_trap   INTEGER,
-            timeticks       [APPLICATION 3] INTEGER,
-            ber_varbindlist ANY
-        }
-        PDUv2 ::= SEQUENCE {
-            request_ID      INTEGER,
-            error_status    INTEGER,
-            error_index     INTEGER,
-            ber_varbindlist ANY
-        }
-    ");
-    my $found = $asn->find('PDU');
-    if (!defined($trap1 = $found->decode($self->{'_TRAP_'}{'datagram'}))) {
-        $LASTERROR = sprintf "Error decoding PDU - %s", (defined($asn->error) ? $asn->error : "Unknown Convert::ASN1->decode() error.  Consider $class dump()");
+    my $trap;
+    if (!defined($trap = $snmpasn->decode($self->{'_TRAP_'}{'datagram'}))) {
+        $LASTERROR = sprintf "Error decoding PDU - %s", (defined($snmpasn->error) ? $snmpasn->error : "Unknown Convert::ASN1->decode() error.  Consider $class dump()");
         return(undef)
     }
-    #DEBUG: use Data::Dumper; print Dumper \$trap1;
+    #DEBUG: use Data::Dumper; print Dumper \$trap;
 
     # Only understand SNMPv1 (0) and v2c (1)
-    if ($trap1->{'version'} > 1) {
-        $LASTERROR = sprintf "Unrecognized SNMP version - %i", $trap1->{'version'};
+    if ($trap->{'version'} > 1) {
+        $LASTERROR = sprintf "Unrecognized SNMP version - %i", $trap->{'version'};
         return(undef)
     }
 
     # set PDU Type for later use
-    my $pdutype = sprintf "%s", keys(%{$trap1->{'pdu_type'}});
-
-    ### Process varbinds
-    my $trap2;
-    $asn->prepare("
-        varbind SEQUENCE OF SEQUENCE {
-            oid OBJECT IDENTIFIER,
-            choice CHOICE {
-                val_integer   INTEGER,
-                val_string    STRING,
-                val_OID       OBJECT IDENTIFIER,
-                val_IpAddr    [APPLICATION 0] STRING,
-                val_Counter32 [APPLICATION 1] INTEGER,
-                val_Guage32   [APPLICATION 2] INTEGER,
-                val_TimeTicks [APPLICATION 3] INTEGER,
-                val_Opaque    [APPLICATION 4] STRING,
-                val_Counter64 [APPLICATION 6] INTEGER
-            }
-        }
-    ");
-    if (!defined($trap2 = $asn->decode($trap1->{'pdu_type'}->{$pdutype}->{'ber_varbindlist'}))) {
-        $LASTERROR = sprintf "Error decoding varbinds - %s", (defined($asn->error) ? $asn->error : "Unknown Convert::ASN1->decode() error.  Consider $class dump()");
-        return(undef)
-    }
-    #DEBUG: use Data::Dumper; print Dumper \$trap2;
+    my $pdutype = sprintf "%s", keys(%{$trap->{'pdu_type'}});
 
     ### Assemble decoded trap object
     # Common
-    $self->{'_TRAP_'}{'version'} = $trap1->{'version'};
-    $self->{'_TRAP_'}{'community'} = $trap1->{'community'};
+    $self->{'_TRAP_'}{'version'} = $trap->{'version'};
+    $self->{'_TRAP_'}{'community'} = $trap->{'community'};
     if ($pdutype eq 'trap') {
         $self->{'_TRAP_'}{'pdu_type'} = 4
     
-    } elsif ($pdutype eq 'inform-request') {
+    } elsif ($pdutype eq 'inform_request') {
         $self->{'_TRAP_'}{'pdu_type'} = 6;
 
         # send response for InformRequest
         if ($RESPONSE) {
-            if ((my $r = &_InformRequest_Response(\$self, \$trap1, $pdutype)) ne 'OK') {
+            if ((my $r = &_InformRequest_Response(\$self, $trap, $pdutype)) ne 'OK') {
                 $LASTERROR = sprintf "Error sending InformRequest Response - %s", $r;
                 return(undef)
             }
         }
 
-    } elsif ($pdutype eq 'snmpv2-trap') { 
+    } elsif ($pdutype eq 'snmpv2_trap') { 
         $self->{'_TRAP_'}{'pdu_type'} = 7
     }
 
     # v1
-    if ($trap1->{'version'} == 0) {
-        $self->{'_TRAP_'}{'ent_OID'}       =          $trap1->{'pdu_type'}->{$pdutype}->{'ent_OID'};
-        $self->{'_TRAP_'}{'agentaddr'}     = inetNtoa($trap1->{'pdu_type'}->{$pdutype}->{'agentaddr'});
-        $self->{'_TRAP_'}{'generic_trap'}  =          $trap1->{'pdu_type'}->{$pdutype}->{'generic_trap'};
-        $self->{'_TRAP_'}{'specific_trap'} =          $trap1->{'pdu_type'}->{$pdutype}->{'specific_trap'};
-        $self->{'_TRAP_'}{'timeticks'}     =          $trap1->{'pdu_type'}->{$pdutype}->{'timeticks'};
+    if ($trap->{'version'} == 0) {
+        $self->{'_TRAP_'}{'ent_oid'}       =          $trap->{'pdu_type'}->{$pdutype}->{'ent_oid'};
+        $self->{'_TRAP_'}{'agent_addr'}    = inetNtoa($trap->{'pdu_type'}->{$pdutype}->{'agent_addr'});
+        $self->{'_TRAP_'}{'generic_trap'}  =          $trap->{'pdu_type'}->{$pdutype}->{'generic_trap'};
+        $self->{'_TRAP_'}{'specific_trap'} =          $trap->{'pdu_type'}->{$pdutype}->{'specific_trap'};
+        $self->{'_TRAP_'}{'timeticks'}     =          $trap->{'pdu_type'}->{$pdutype}->{'timeticks'};
 
     # v2c
-    } elsif ($trap1->{'version'} == 1) {
-        $self->{'_TRAP_'}{'request_ID'}   = $trap1->{'pdu_type'}->{$pdutype}->{'request_ID'};
-        $self->{'_TRAP_'}{'error_status'} = $trap1->{'pdu_type'}->{$pdutype}->{'error_status'};
-        $self->{'_TRAP_'}{'error_index'}  = $trap1->{'pdu_type'}->{$pdutype}->{'error_index'};
+    } elsif ($trap->{'version'} == 1) {
+        $self->{'_TRAP_'}{'request_id'}   = $trap->{'pdu_type'}->{$pdutype}->{'request_id'};
+        $self->{'_TRAP_'}{'error_status'} = $trap->{'pdu_type'}->{$pdutype}->{'error_status'};
+        $self->{'_TRAP_'}{'error_index'}  = $trap->{'pdu_type'}->{$pdutype}->{'error_index'};
     }
 
     # varbinds
     my @varbinds;
-    for my $i (0..$#{$trap2->{'varbind'}}) {
+    for my $i (0..$#{$trap->{'pdu_type'}->{$pdutype}->{'varbindlist'}}) {
         my %oidval;
-        for (keys(%{$trap2->{'varbind'}[$i]->{'choice'}})) {
-            $oidval{$trap2->{'varbind'}[$i]->{'oid'}} = (
-                                                         defined($trap2->{'varbind'}[$i]->{'choice'}{$_}) ? 
-                                                           (($_ eq 'val_IpAddr') ? 
-                                                             inetNtoa($trap2->{'varbind'}[$i]->{'choice'}{$_}) : 
-                                                           $trap2->{'varbind'}[$i]->{'choice'}{$_}) : 
-                                                         ""
-                                                        )
+        for (keys(%{$trap->{'pdu_type'}->{$pdutype}->{'varbindlist'}[$i]->{'value'}})) {
+            # defined
+            if (defined($trap->{'pdu_type'}->{$pdutype}->{'varbindlist'}[$i]->{'value'}{$_})) {
+                # special cases:  IP address, null
+                if ($_ eq 'ipaddr') {
+                    $oidval{$trap->{'pdu_type'}->{$pdutype}->{'varbindlist'}[$i]->{'oid'}} = inetNtoa($trap->{'pdu_type'}->{$pdutype}->{'varbindlist'}[$i]->{'value'}{$_})
+                } elsif ($_ eq 'null') {
+                    $oidval{$trap->{'pdu_type'}->{$pdutype}->{'varbindlist'}[$i]->{'oid'}} = '(NULL)'
+                # no special case:  just assign it
+                } else {
+                    $oidval{$trap->{'pdu_type'}->{$pdutype}->{'varbindlist'}[$i]->{'oid'}} =          $trap->{'pdu_type'}->{$pdutype}->{'varbindlist'}[$i]->{'value'}{$_}
+                }
+            # not defined - ""
+            } else {
+                $oidval{$trap->{'pdu_type'}->{$pdutype}->{'varbindlist'}[$i]->{'oid'}} = ""
+            }
         }
         push @varbinds, \%oidval
     }
@@ -399,12 +410,12 @@ sub pdu_type {
 
 sub ent_OID {
     my $self = shift;
-    return $self->{'_TRAP_'}{'ent_OID'}
+    return $self->{'_TRAP_'}{'ent_oid'}
 }
 
 sub agentaddr {
     my $self = shift;
-    return $self->{'_TRAP_'}{'agentaddr'}
+    return $self->{'_TRAP_'}{'agent_addr'}
 }
 
 sub generic_trap {
@@ -429,7 +440,7 @@ sub timeticks {
 
 sub request_ID {
     my $self = shift;
-    return $self->{'_TRAP_'}{'request_ID'}
+    return $self->{'_TRAP_'}{'request_id'}
 }
 
 sub error_status {
@@ -491,38 +502,18 @@ sub dump {
 
 sub _InformRequest_Response {
 
-    my ($self, $trap1, $pdutype) = @_;
+    my ($self, $trap, $pdutype) = @_;
     my $class = ref($$self) || $$self;
 
-    my $asn = new Convert::ASN1;
-    $asn->prepare("
-        PDU ::= SEQUENCE {
-            version   INTEGER,
-            community STRING,
-            pdu_type  [2] IMPLICIT PDUv2
-        }
-        PDUv2 ::= SEQUENCE {
-            request_ID      INTEGER,
-            error_status    INTEGER,
-            error_index     INTEGER,
-            ber_varbindlist ANY
-        }
-    ");
-    my $found = $asn->find('PDU');
-    my $buffer = $found->encode(
-        version      => $$trap1->{'version'},
-        community    => $$trap1->{'community'},
-        pdu_type     => {
-            request_ID      => $$trap1->{'pdu_type'}->{$pdutype}->{'request_ID'},
-            error_status    => $$trap1->{'pdu_type'}->{$pdutype}->{'error_status'},
-            error_index     => $$trap1->{'pdu_type'}->{$pdutype}->{'error_index'},
-            ber_varbindlist => $$trap1->{'pdu_type'}->{$pdutype}->{'ber_varbindlist'}
-        }
-    );
+    # Change from request to response
+    $trap->{'pdu_type'}{'response'} = delete $trap->{'pdu_type'}{'inform_request'};
+
+    my $buffer = $snmpasn->encode($trap);
     if (!defined($buffer)) {
-        return $asn->error
+        return $snmpasn->error
     }
     #DEBUG print "BUFFER = $buffer\n";
+
     if ($$self->{'_TRAP_'}->{'PeerAddr'} eq "") {
         return "Peer Addr undefined"
     }
@@ -542,6 +533,9 @@ sub _InformRequest_Response {
                                     ) || return "Can't create Response socket";
     $socket->send($buffer);
     close $socket;
+
+    # Change back to request from response
+    $trap->{'pdu_type'}{'inform_request'} = delete $trap->{'pdu_type'}{'response'};
     return ("OK")
 }
 

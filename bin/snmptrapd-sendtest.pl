@@ -21,6 +21,7 @@ GetOptions(
   'counter32|C=i' => \$opt{counter32},
   'gauge32=i'     => \$opt{gauge32},
   'timeticks=i'   => \$opt{timeticks},
+  'N|null=s'      => \$opt{null},
   'opaque|q=s'    => \$opt{opaque},
   'I|inform!'     => \$opt{inform},
   'help!'         => \$opt_help,
@@ -53,6 +54,7 @@ $opt{counter32} = $opt{counter32} || 32323232;
 $opt{gauge32}   = $opt{gauge32}   || 42424242;
 $opt{timeticks} = $opt{timeticks} || time();
 $opt{opaque}    = $opt{opaque}    || 'opaque data';
+$opt{null}      = $opt{null}      || "\0";
 $opt{inform}    = $opt{inform}    || 0;
 
 for my $host (@ARGV) {
@@ -85,7 +87,8 @@ for my $host (@ARGV) {
                 '1.3.6.1.4.1.50000.1.8',  COUNTER32,         $opt{counter32},
                 '1.3.6.1.4.1.50000.1.9',  GAUGE32,           $opt{gauge32},
                 '1.3.6.1.4.1.50000.1.10', TIMETICKS,         $opt{timeticks},
-                '1.3.6.1.4.1.50000.1.11', OPAQUE,            $opt{opaque}
+                '1.3.6.1.4.1.50000.1.11', OPAQUE,            $opt{opaque},
+                '1.3.6.1.4.1.50000.1.12', NULL,              $opt{null}
             ]
         )
     } elsif ($opt{version} == 2) {
@@ -102,7 +105,8 @@ for my $host (@ARGV) {
                     '1.3.6.1.4.1.50000.1.8',  COUNTER32,         $opt{counter32},
                     '1.3.6.1.4.1.50000.1.9',  GAUGE32,           $opt{gauge32},
                     '1.3.6.1.4.1.50000.1.10', TIMETICKS,         $opt{timeticks},
-                    '1.3.6.1.4.1.50000.1.11', OPAQUE,            $opt{opaque}
+                    '1.3.6.1.4.1.50000.1.11', OPAQUE,            $opt{opaque},
+                    '1.3.6.1.4.1.50000.1.12', NULL,              $opt{null}
                 ]
             )
         } else {
@@ -118,7 +122,8 @@ for my $host (@ARGV) {
                     '1.3.6.1.4.1.50000.1.8',  COUNTER32,         $opt{counter32},
                     '1.3.6.1.4.1.50000.1.9',  GAUGE32,           $opt{gauge32},
                     '1.3.6.1.4.1.50000.1.10', TIMETICKS,         $opt{timeticks},
-                    '1.3.6.1.4.1.50000.1.11', OPAQUE,            $opt{opaque}
+                    '1.3.6.1.4.1.50000.1.11', OPAQUE,            $opt{opaque},
+                    '1.3.6.1.4.1.50000.1.12', NULL,              $opt{null}
                 ]
             )
         }
@@ -182,6 +187,9 @@ The user can configure the values with the options.
 
  -in #          SNMP INTEGER value.
  --integer      DEFAULT:  (or not specified) 1
+
+ -N <string>    SNMP NULL value.
+ --null         DEFAULT:  (or not specified) NULL
 
  -oi <OID>      SNMP OBJECT_IDENTIFIER value.
  --oid          DEFAULT:  (or not specified) 1.2.3.4.5.6.7.8.9

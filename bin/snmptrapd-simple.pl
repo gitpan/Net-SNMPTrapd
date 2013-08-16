@@ -12,6 +12,7 @@ GetOptions(
   '4!'          => \$opt{4},
   '6!'          => \$opt{6},
   'directory=s' => \$opt{dir},
+  'Dump!'       => \$opt{dump},
   'Hexdump!'    => \$opt{hex},
   'interface:i' => \$opt{interface},
   'write+'      => \$opt{write},
@@ -82,6 +83,8 @@ while (1) {
         my $p;
         if ($opt{hex}) {
             $p = $trap->datagram(1)
+        } elsif ($opt{dump}) {
+            $trap->dump
         } else {
             $p = sprintf "%s\t%i\t%i\t%s\t%s\t", 
                              $trap->remoteaddr, 
@@ -168,6 +171,9 @@ file.  Can decode SNMP v1 and v2c traps and v2c InformRequest
 
  -d <dir>         Output file directory.
  --directory      DEFAULT:  (or not specified) [Current].
+
+ -D               Use Net::SNMPTrapd->dump() method.
+ --Dump           DEFAULT:  (or not specified) [Decode trap].
 
  -H               Print hex dump of trap PDU - do not decode.
  --Hexdump        DEFAULT:  (or not specified) [Decode trap].

@@ -53,3 +53,8 @@ Revision history for Perl extension Net::SNMPTrapd.
 
 0.11  Mon Feb  4 09:30:00 2013
       - pack_sockaddr_in / _in6 needed Socket:: prefix - RT# 83021.
+
+0.12  Fri Aug 16 09:30:00 2013
+      - Updated Convert::ASN1 into single encode/decode.
+      - Added NULL varbind.
+      - Updated bin scripts: send has NULL value option, server has dump
