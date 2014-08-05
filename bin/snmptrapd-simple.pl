@@ -1,9 +1,11 @@
 #!/usr/bin/perl
 
 use strict;
-use Net::SNMPTrapd;
+use warnings;
 use Getopt::Long qw(:config no_ignore_case); #bundling
 use Pod::Usage;
+
+use Net::SNMPTrapd;
 
 my %opt;
 my ($opt_help, $opt_man);
@@ -87,23 +89,23 @@ while (1) {
             $trap->dump
         } else {
             $p = sprintf "%s\t%i\t%i\t%s\t%s\t", 
-                             $trap->remoteaddr, 
-                             $trap->remoteport, 
-                             $trap->version, 
-                             $trap->community,
-                             $trap->pdu_type;
+                $trap->remoteaddr, 
+                $trap->remoteport, 
+                $trap->version, 
+                $trap->community,
+                $trap->pdu_type;
             if ($trap->version == 1) {
                 $p .= sprintf "%s\t%s\t%s\t%s\t%s\t", 
-                             $trap->ent_OID, 
-                             $trap->agentaddr, 
-                             $trap->generic_trap, 
-                             $trap->specific_trap, 
-                             $trap->timeticks
+                    $trap->ent_OID, 
+                    $trap->agentaddr, 
+                    $trap->generic_trap, 
+                    $trap->specific_trap, 
+                    $trap->timeticks
             } else {
                 $p .= sprintf "%s\t%s\t%s\t", 
-                             $trap->request_ID, 
-                             $trap->error_status, 
-                             $trap->error_index
+                    $trap->request_ID, 
+                    $trap->error_status, 
+                    $trap->error_index
             }
             for my $varbind (@{$trap->varbinds}) {
                 for (keys(%{$varbind})) {
@@ -136,6 +138,8 @@ while (1) {
         }
     }
 }
+
+__END__
 
 =head1 NAME
 

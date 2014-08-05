@@ -4,9 +4,9 @@
       "Michael Vincent <vin at vinsworld dot com>"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "ExtUtils::MakeMaker version 6.6302, CPAN::Meta::Converter version 2.120921",
+   "generated_by" : "ExtUtils::MakeMaker version 6.72, CPAN::Meta::Converter version 2.132140",
    "license" : [
-      "unknown"
+      "perl_5"
    ],
    "meta-spec" : {
       "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
@@ -39,5 +39,5 @@
       }
    },
    "release_status" : "stable",
-   "version" : "0.12"
+   "version" : "0.13"
 }

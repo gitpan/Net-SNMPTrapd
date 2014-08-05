@@ -92,11 +92,11 @@ sub test4 {
 
         # SNMPv1 Trap
         my ($session, $error) = Net::SNMP->session(
-                                                   -hostname  => 'localhost',
-                                                   -version   => 1,
-                                                   -community => 'public',
-                                                   -port      => 162
-                                                  );
+            -hostname  => 'localhost',
+            -version   => 1,
+            -community => 'public',
+            -port      => 162
+        );
 
         if (!defined($session)) {
            printf "Error: Starting SNMP session (v1 trap) - %s\n", $error;
@@ -123,11 +123,11 @@ sub test4 {
 
         # SNMPv2 Trap
         ($session, $error) = Net::SNMP->session(
-                                                   -hostname  => 'localhost',
-                                                   -version   => 2,
-                                                   -community => 'public',
-                                                   -port      => 162
-                                                  );
+            -hostname  => 'localhost',
+            -version   => 2,
+            -community => 'public',
+            -port      => 162
+        );
 
         if (!defined($session)) {
            printf "Error: Starting SNMP session (v2c trap) - %s\n", $error;
@@ -153,11 +153,11 @@ sub test4 {
         # SNMPv2 InformRequest
         # This will keep sending until a Response is successfully sent from the Server or until timeout
         ($session, $error) = Net::SNMP->session(
-                                                   -hostname  => 'localhost',
-                                                   -version   => 2,
-                                                   -community => 'public',
-                                                   -port      => 162
-                                                  );
+            -hostname  => 'localhost',
+            -version   => 2,
+            -community => 'public',
+            -port      => 162
+        );
 
         if (!defined($session)) {
            printf "Error: Starting SNMP session (v2c InformRequest) - %s\n", $error;
@@ -277,10 +277,10 @@ sub test5 {
 
     use IO::Socket::INET;
     my $snmptrapd = IO::Socket::INET->new(
-                                          'Proto'     => 'udp',
-                                          'LocalPort' => 162,
-                                          'Timeout'   => 10
-                                         );
+        'Proto'     => 'udp',
+        'LocalPort' => 162,
+        'Timeout'   => 10
+    );
 
     if (!defined($snmptrapd)) {
         print "Error: creating socket\n";
@@ -300,11 +300,11 @@ sub test5 {
         # SNMPv2 InformRequest
         # This will keep sending until a Response is successfully sent from the Server or until timeout
         my ($session, $error) = Net::SNMP->session(
-                                                   -hostname  => 'localhost',
-                                                   -version   => 2,
-                                                   -community => 'public',
-                                                   -port      => 162
-                                                  );
+            -hostname  => 'localhost',
+            -version   => 2,
+            -community => 'public',
+            -port      => 162
+        );
 
         if (!defined($session)) {
            printf "Error: Starting SNMP session (v2c InformRequest) - %s\n", $error;

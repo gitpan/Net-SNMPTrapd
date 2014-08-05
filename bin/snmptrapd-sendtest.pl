@@ -1,9 +1,11 @@
 #! /usr/bin/perl
 
 use strict;
-use Net::SNMP qw(:ALL);
+use warnings
 use Getopt::Long qw(:config no_ignore_case); #bundling
 use Pod::Usage;
+
+use Net::SNMP qw(:ALL);
 
 my %opt;
 my ($opt_help, $opt_man);
@@ -133,6 +135,8 @@ for my $host (@ARGV) {
     }
     $session->close()
 }
+
+__END__
 
 =head1 NAME
 
